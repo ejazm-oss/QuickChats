@@ -68,26 +68,16 @@ export const sendMessage = async (req, res) =>{
         const receiverId = req.params.id;
         const senderId = req.user._id;
 
-        // Validate that either text or image is provided
-        if(!text?.trim() && !image){
-            return res.json({success: false, message: "Message must contain text or image"})
-        }
-
         let imageUrl;
         if(image){
-            try {
-                const uploadResponse = await cloudinary.uploader.upload(image)
-                imageUrl = uploadResponse.secure_url;
-            } catch (uploadError) {
-                console.log("Image upload error:", uploadError.message);
-                return res.json({success: false, message: "Failed to upload image. Please try again."})
-            }
+            const uploadResponse = await cloudinary.uploader.upload(image)
+            imageUrl = uploadResponse.secure_url;
         }
         const newMessage = await Message.create({
             senderId,
             receiverId,
-            text: text?.trim() || null,
-            image: imageUrl || null
+            text,
+            image: imageUrl
         })
 
         // Emit the new message to the receiver's socket
@@ -100,6 +90,6 @@ export const sendMessage = async (req, res) =>{
 
     } catch (error) {
         console.log(error.message);
-        res.json({success: false, message: error.message || "Failed to send message"})
+        res.json({success: false, message: error.message})
     }
 }

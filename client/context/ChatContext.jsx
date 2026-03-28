@@ -46,58 +46,39 @@ export const ChatProvider = ({ children })=>{
             if(data.success){
                 setMessages((prevMessages)=>[...prevMessages, data.newMessage])
             }else{
-                const errorMsg = data.message || "Failed to send message";
-                toast.error(errorMsg);
-                throw new Error(errorMsg);
+                toast.error(data.message);
             }
         } catch (error) {
-            const errorMsg = error.response?.data?.message || error.message || "Failed to send message";
-            toast.error(errorMsg);
-            throw new Error(errorMsg);
+            toast.error(error.message);
         }
     }
 
     // function to subscribe to messages for selected user
-    const subscribeToMessages = () =>{
+    const subscribeToMessages = async () =>{
         if(!socket) return;
 
-        const handleNewMessage = (newMessage)=>{
+        socket.on("newMessage", (newMessage)=>{
             if(selectedUser && newMessage.senderId === selectedUser._id){
                 newMessage.seen = true;
                 setMessages((prevMessages)=> [...prevMessages, newMessage]);
                 axios.put(`/api/messages/mark/${newMessage._id}`);
             }else{
                 setUnseenMessages((prevUnseenMessages)=>({
-                    ...prevUnseenMessages,
-                    [newMessage.senderId]: prevUnseenMessages[newMessage.senderId] ? prevUnseenMessages[newMessage.senderId] + 1 : 1
-                }));
+                    ...prevUnseenMessages, [newMessage.senderId] : prevUnseenMessages[newMessage.senderId] ? prevUnseenMessages[newMessage.senderId] + 1 : 1
+                }))
             }
-        };
+        })
+    }
 
-        socket.on("newMessage", handleNewMessage);
-
-        return () => {
-            socket.off("newMessage", handleNewMessage);
-        };
+    // function to unsubscribe from messages
+    const unsubscribeFromMessages = ()=>{
+        if(socket) socket.off("newMessage");
     }
 
     useEffect(()=>{
-        const cleanup = subscribeToMessages();
-        return () => {
-            if (cleanup) cleanup();
-        }
-    },[socket, selectedUser]);
-
-    // Fallback polling for environments where socket is not available (e.g., Vercel serverless websocket limits)
-    useEffect(()=>{
-        if(socket || !selectedUser) return;
-
-        const interval = setInterval(()=>{
-            getMessages(selectedUser._id);
-        }, 2500);
-
-        return ()=> clearInterval(interval);
-    }, [socket, selectedUser]);
+        subscribeToMessages();
+        return ()=> unsubscribeFromMessages();
+    },[socket, selectedUser])
 
     const value = {
         messages, users, selectedUser, getUsers, getMessages, sendMessage, setSelectedUser, unseenMessages, setUnseenMessages
