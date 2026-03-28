@@ -41,23 +41,15 @@ export const ChatProvider = ({ children })=>{
 
     // function to send message to selected user
     const sendMessage = async (messageData)=>{
-        try {
-            const {data} = await axios.post(`/api/messages/send/${selectedUser._id}`, messageData);
-            if(data.success){
-                setMessages((prevMessages)=>[...prevMessages, data.newMessage])
-            }else{
-                toast.error(data.message);
-            }
-        } catch (error) {
-            toast.error(error.message);
-        }
+        if(!socket) return;
+        socket.emit("sendMessage", { ...messageData, receiverId: selectedUser._id });
     }
 
     // function to subscribe to messages for selected user
     const subscribeToMessages = async () =>{
         if(!socket) return;
 
-        socket.on("newMessage", (newMessage)=>{
+        socket.on("receiveMessage", (newMessage)=>{
             if(selectedUser && newMessage.senderId === selectedUser._id){
                 newMessage.seen = true;
                 setMessages((prevMessages)=> [...prevMessages, newMessage]);
@@ -68,11 +60,23 @@ export const ChatProvider = ({ children })=>{
                 }))
             }
         })
+
+        socket.on("messageSent", (newMessage)=>{
+            setMessages((prevMessages)=>[...prevMessages, newMessage])
+        })
+
+        socket.on("messageError", (error)=>{
+            toast.error(error.message);
+        })
     }
 
     // function to unsubscribe from messages
     const unsubscribeFromMessages = ()=>{
-        if(socket) socket.off("newMessage");
+        if(socket) {
+            socket.off("receiveMessage");
+            socket.off("messageSent");
+            socket.off("messageError");
+        }
     }
 
     useEffect(()=>{

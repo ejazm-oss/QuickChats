@@ -83,7 +83,11 @@ const login = async (state, credentials)=>{
                 userId: userData._id,
             },
             transports: ["websocket"],
-            path: "/socket.io"
+            path: "/socket.io",
+            autoConnect: true,
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
         });
 
         newSocket.on("connect", ()=>{
