@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import { io } from "socket.io-client"
 
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL;
+const backendUrl = import.meta.env.VITE_BACKEND_URL || window.location.origin;
 axios.defaults.baseURL = backendUrl;
 
 export const AuthContext = createContext();
@@ -81,14 +81,28 @@ const login = async (state, credentials)=>{
         const newSocket = io(backendUrl, {
             query: {
                 userId: userData._id,
-            }
+            },
+            transports: ["websocket"],
+            path: "/socket.io"
         });
-        newSocket.connect();
+
+        newSocket.on("connect", ()=>{
+            console.log("Socket connected", newSocket.id);
+        });
+
+        newSocket.on("connect_error", (err)=>{
+            console.error("Socket connection error", err);
+        });
+
+        newSocket.on("disconnect", (reason)=>{
+            console.log("Socket disconnected", reason);
+        });
+
         setSocket(newSocket);
 
         newSocket.on("getOnlineUsers", (userIds)=>{
             setOnlineUsers(userIds);
-        })
+        });
     }
 
     useEffect(()=>{

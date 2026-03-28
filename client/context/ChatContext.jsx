@@ -58,31 +58,46 @@ export const ChatProvider = ({ children })=>{
     }
 
     // function to subscribe to messages for selected user
-    const subscribeToMessages = async () =>{
+    const subscribeToMessages = () =>{
         if(!socket) return;
 
-        socket.on("newMessage", (newMessage)=>{
+        const handleNewMessage = (newMessage)=>{
             if(selectedUser && newMessage.senderId === selectedUser._id){
                 newMessage.seen = true;
                 setMessages((prevMessages)=> [...prevMessages, newMessage]);
                 axios.put(`/api/messages/mark/${newMessage._id}`);
             }else{
                 setUnseenMessages((prevUnseenMessages)=>({
-                    ...prevUnseenMessages, [newMessage.senderId] : prevUnseenMessages[newMessage.senderId] ? prevUnseenMessages[newMessage.senderId] + 1 : 1
-                }))
+                    ...prevUnseenMessages,
+                    [newMessage.senderId]: prevUnseenMessages[newMessage.senderId] ? prevUnseenMessages[newMessage.senderId] + 1 : 1
+                }));
             }
-        })
-    }
+        };
 
-    // function to unsubscribe from messages
-    const unsubscribeFromMessages = ()=>{
-        if(socket) socket.off("newMessage");
+        socket.on("newMessage", handleNewMessage);
+
+        return () => {
+            socket.off("newMessage", handleNewMessage);
+        };
     }
 
     useEffect(()=>{
-        subscribeToMessages();
-        return ()=> unsubscribeFromMessages();
-    },[socket, selectedUser])
+        const cleanup = subscribeToMessages();
+        return () => {
+            if (cleanup) cleanup();
+        }
+    },[socket, selectedUser]);
+
+    // Fallback polling for environments where socket is not available (e.g., Vercel serverless websocket limits)
+    useEffect(()=>{
+        if(socket || !selectedUser) return;
+
+        const interval = setInterval(()=>{
+            getMessages(selectedUser._id);
+        }, 2500);
+
+        return ()=> clearInterval(interval);
+    }, [socket, selectedUser]);
 
     const value = {
         messages, users, selectedUser, getUsers, getMessages, sendMessage, setSelectedUser, unseenMessages, setUnseenMessages
